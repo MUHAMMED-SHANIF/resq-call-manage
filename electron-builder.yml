@@ -1,0 +1,27 @@
+appId: com.primecare.calldistribution
+productName: Call Distribution Dashboard
+directories:
+  output: release
+files:
+  - dist/**/*
+  - main.js
+  - preload.js
+  - database.js
+  - whatsapp.js
+  - src/utils/phoneNormalizer.js
+  - src/config.js
+  - package.json
+  - node_modules/**/*
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Call Distribution Dashboard
+  runAfterFinish: true

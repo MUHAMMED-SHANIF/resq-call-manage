@@ -1,0 +1,79 @@
+{
+  "project_name": "Call Distribution Desktop App",
+  "status": "COMPLETED",
+  "current_stage": "Verified & Ready for Packaging",
+  "timestamp": "2026-08-10T19:13:42+05:30",
+  "architecture": {
+    "framework": "Electron with React (Vite)",
+    "styling": "Vanilla CSS (Inter typography, responsive grid)",
+    "offline_parsing": "SheetJS (xlsx) - parses entirely client-side"
+  },
+  "features_implemented": [
+    {
+      "feature": "File Loading Loader",
+      "description": "Shows an immediate visual processing spinner screen while parsing the Excel (.xlsx / .xlsb) database to prevent UI freezing."
+    },
+    {
+      "feature": "Dynamic Aliases Mapping",
+      "description": "Standardizes column headers case-insensitively, handling spelling variations like 'Prduct Description' or 'Created on'."
+    },
+    {
+      "feature": "Custom Data Display Formatting",
+      "description": "Displays 'Request Start' and 'Id' with headings. All other fields (Order Type, Sold To Party, Brand Name, Product Description) are displayed as pure data line-by-line without labels."
+    },
+    {
+      "feature": "Multiline Card Notes",
+      "description": "Includes an editable notes/phone text area inside each card right before the Brand Name. Stored persistently in parent state (no text lost during filters) and integrated into the clipboard-copy format."
+    },
+    {
+      "feature": "Pincode Place Grouping",
+      "description": "Automatically categorizes records by pincode into Manjeri, Kondotty, Wandoor, Areekode, Malappuram, and Transfer (which includes standard transfer pincodes and any other unlisted pincodes)."
+    },
+    {
+      "feature": "Places Filter Dropdown",
+      "description": "Displays a clean dropdown filter indicating dynamic matching counts for each place (e.g. Manjeri (12), Transfer (4))."
+    },
+    {
+      "feature": "Conditional City Bifurcation",
+      "description": "Outputs 'up' only if the raw cell value is exactly 'up1' (case-insensitive); otherwise, it is completely hidden."
+    }
+  ],
+  "project_structure": {
+    "main_process": "main.js",
+    "preload_script": "preload.js",
+    "configurations": {
+      "vite_config": "vite.config.js",
+      "electron_builder_config": "electron-builder.yml"
+    },
+    "source_code": {
+      "entry": "src/main.jsx",
+      "layout": "src/App.jsx",
+      "styles": "src/index.css",
+      "config_file": "src/config.js",
+      "utilities": [
+        "src/utils/excelParser.js",
+        "src/utils/dateFormatter.js"
+      ],
+      "components": [
+        "src/components/Dropzone.jsx",
+        "src/components/PlaceFilter.jsx",
+        "src/components/CardGrid.jsx",
+        "src/components/DataCard.jsx",
+        "src/components/SettingsModal.jsx"
+      ]
+    }
+  },
+  "compilation_status": {
+    "react_build": "SUCCESS",
+    "bundle_assets": [
+      "dist/index.html",
+      "dist/assets/index-*.css",
+      "dist/assets/index-*.js"
+    ]
+  },
+  "npm_scripts": {
+    "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:electron\" - Starts local server and launches Electron window",
+    "build": "vite build - Compiles client assets into the dist folder",
+    "package": "npm run build && electron-builder --win - Generates a standalone Windows Installer (.exe) in the release folder"
+  }
+}
