@@ -355,6 +355,7 @@ function rebuildDuplicateFlags() {
     SELECT p1.normalized_number, p1.call_id as matched_call_id, p2.call_id as flagged_call_id
     FROM phone_numbers p1
     JOIN phone_numbers p2 ON p1.normalized_number = p2.normalized_number AND p1.call_id < p2.call_id
+    WHERE p1.normalized_number != ''
   `).all();
 
   const insertFlag = db.prepare(`
@@ -396,13 +397,13 @@ export function getPendingCalls() {
         WHERE pn.call_id = c.id
       ) as phoneNumbers,
       (
-        SELECT 1
+        SELECT pn.raw_input
         FROM phone_numbers pn
         JOIN phone_numbers other ON other.normalized_number = pn.normalized_number AND other.call_id != pn.call_id
         JOIN calls other_call ON other.call_id = other_call.id
-        WHERE pn.call_id = c.id AND other_call.status IN ('approved', 'rejected')
+        WHERE pn.call_id = c.id AND pn.normalized_number != ''
         LIMIT 1
-      ) as isDuplicate
+      ) as duplicateNumberTrigger
     FROM calls c
     WHERE c.status = 'pending' OR c.imported_at = (SELECT MAX(imported_at) FROM calls)
     ORDER BY c.imported_at DESC
@@ -422,7 +423,8 @@ export function getPendingCalls() {
     createdOn: r.createdOn,
     cityBifurcation: r.upFlag === 1 ? 'up1' : 'Local',
     phoneNumbers: r.phoneNumbers || '',
-    isDuplicate: r.isDuplicate === 1,
+    isDuplicate: r.duplicateNumberTrigger !== null,
+    duplicateNumberTrigger: r.duplicateNumberTrigger,
     whatsappStatus: r.whatsappStatus
   }));
 }
@@ -489,8 +491,8 @@ export function updateCallData(callId, note, phones) {
     `);
 
     for (const p of phones) {
-      if (p.trim() !== '') {
-        const norm = normalizePhoneNumber(p);
+      if (p !== undefined && p !== null) {
+        const norm = p.trim() !== '' ? normalizePhoneNumber(p) : '';
         insertPhone.run(callId, p, norm);
       }
     }
@@ -566,8 +568,8 @@ export function rejectCall(callId) {
 /**
  * Fetches call history of a specific phone number for duplicate checking.
  */
-export function getDuplicateHistory(normalizedNumber) {
-  return db.prepare(`
+export function getDuplicateHistory(normalizedNumber, excludeCallId) {
+  let query = `
     SELECT 
       c.request_id,
       c.brand_name,
@@ -575,12 +577,22 @@ export function getDuplicateHistory(normalizedNumber) {
       c.status,
       c.notes,
       c.approved_date,
-      c.rejected_date
+      c.rejected_date,
+      c.created_on
     FROM calls c
     JOIN phone_numbers pn ON pn.call_id = c.id
-    WHERE pn.normalized_number = ? AND c.status IN ('approved', 'rejected')
-    ORDER BY COALESCE(c.approved_date, c.rejected_date) DESC
-  `).all(normalizedNumber);
+    WHERE pn.normalized_number = ?
+  `;
+  const params = [normalizedNumber];
+
+  if (excludeCallId) {
+    query += ` AND c.id != ?`;
+    params.push(excludeCallId);
+  }
+
+  query += ` ORDER BY COALESCE(c.approved_date, c.rejected_date, c.created_on) DESC`;
+
+  return db.prepare(query).all(...params);
 }
 
 /**
@@ -632,3 +644,50 @@ export function updateAllPlaceGroups(placesConfig) {
 
   runUpdates();
 }
+
+/**
+ * Permanently deletes a single history record (approved or rejected) and its phone numbers.
+ * Only allowed if the record is in 'approved' or 'rejected' status.
+ */
+export function deleteHistoryCall(callId) {
+  const call = db.prepare(`SELECT id, status FROM calls WHERE id = ?`).get(callId);
+  if (!call) throw new Error(`Call ${callId} not found.`);
+  if (!['approved', 'rejected'].includes(call.status)) {
+    throw new Error(`Call ${callId} is not in history (status: ${call.status}). Only approved/rejected calls can be deleted from history.`);
+  }
+
+  const doDelete = db.transaction(() => {
+    db.prepare(`DELETE FROM phone_numbers WHERE call_id = ?`).run(callId);
+    db.prepare(`DELETE FROM duplicate_flags WHERE matched_call_id = ? OR flagged_call_id = ?`).run(callId, callId);
+    db.prepare(`DELETE FROM calls WHERE id = ?`).run(callId);
+  });
+
+  doDelete();
+}
+
+/**
+ * Permanently wipes ALL approved and rejected call records and their associated data.
+ * This is a destructive, irreversible operation.
+ */
+export function clearAllHistory() {
+  const doClear = db.transaction(() => {
+    // Get all approved/rejected call IDs
+    const historicIds = db.prepare(`SELECT id FROM calls WHERE status IN ('approved', 'rejected')`).all().map(r => r.id);
+
+    if (historicIds.length === 0) return 0;
+
+    // Remove associated phone numbers and duplicate flags
+    for (const id of historicIds) {
+      db.prepare(`DELETE FROM phone_numbers WHERE call_id = ?`).run(id);
+      db.prepare(`DELETE FROM duplicate_flags WHERE matched_call_id = ? OR flagged_call_id = ?`).run(id, id);
+    }
+
+    // Delete all historic call rows
+    db.prepare(`DELETE FROM calls WHERE status IN ('approved', 'rejected')`).run();
+
+    return historicIds.length;
+  });
+
+  return doClear();
+}
+

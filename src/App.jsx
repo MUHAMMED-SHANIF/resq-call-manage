@@ -262,15 +262,15 @@ export default function App() {
   const handleApproveAll = async () => {
     const withPhone = finalFilteredPending.filter(call => {
       const phones = call.phoneNumbers ? call.phoneNumbers.split(', ').filter(p => p.trim() !== '') : [];
-      return phones.length > 0;
+      return phones.length > 0 && !call.isDuplicate;
     });
-    const withoutPhone = finalFilteredPending.filter(call => {
+    const skipped = finalFilteredPending.filter(call => {
       const phones = call.phoneNumbers ? call.phoneNumbers.split(', ').filter(p => p.trim() !== '') : [];
-      return phones.length === 0;
+      return phones.length === 0 || call.isDuplicate;
     });
 
     if (withPhone.length === 0) {
-      addToast('No calls with phone numbers to approve.', true);
+      addToast('No eligible calls to approve. Duplicates and those without phones are skipped.', true);
       return;
     }
 
@@ -279,8 +279,8 @@ export default function App() {
     if (window.api) {
       try {
         await window.api.batchApproveCalls(callIds);
-        if (withoutPhone.length > 0) {
-          addToast(`Approved ${withPhone.length} call(s). ${withoutPhone.length} skipped — no phone number.`, false);
+        if (skipped.length > 0) {
+          addToast(`Approved ${withPhone.length} call(s). ${skipped.length} skipped (duplicate/no phone).`, false);
         } else {
           addToast(`Approved all ${withPhone.length} call(s) successfully!`);
         }
@@ -574,6 +574,7 @@ export default function App() {
         }}
         normalizedNumber={duplicateCheckNumber}
         currentServiceOrder={duplicateCheckCardId ? pendingCalls.find(c => c.id === duplicateCheckCardId)?.serviceOrder : null}
+        currentCallId={duplicateCheckCardId}
         onApproveAnyway={duplicateCheckCardId ? () => handleApproveCall(duplicateCheckCardId) : null}
       />
 

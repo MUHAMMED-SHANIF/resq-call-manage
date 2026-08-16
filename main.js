@@ -14,7 +14,9 @@ import {
   getPhoneNumbersForCall,
   getDbStatus,
   updateAllPlaceGroups,
-  batchApproveCalls
+  batchApproveCalls,
+  deleteHistoryCall,
+  clearAllHistory
 } from './database.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -88,8 +90,8 @@ ipcMain.handle('db:update-call-data', async (event, callId, note, phones) => {
 });
 
 // Check number history
-ipcMain.handle('db:get-duplicate-history', async (event, normalizedNumber) => {
-  return getDuplicateHistory(normalizedNumber);
+ipcMain.handle('db:get-duplicate-history', async (event, normalizedNumber, excludeCallId) => {
+  return getDuplicateHistory(normalizedNumber, excludeCallId);
 });
 
 // Helper: Formats call object to standard copy text / WhatsApp message layout
@@ -162,6 +164,28 @@ ipcMain.handle('db:update-all-place-groups', async (event, placesConfig) => {
     return { success: true };
   } catch (err) {
     console.error('IPC db:update-all-place-groups error:', err);
+    throw err;
+  }
+});
+
+// Delete a single history record permanently
+ipcMain.handle('db:delete-history-call', async (event, callId) => {
+  try {
+    deleteHistoryCall(callId);
+    return { success: true };
+  } catch (err) {
+    console.error('IPC db:delete-history-call error:', err);
+    throw err;
+  }
+});
+
+// Wipe ALL history records permanently
+ipcMain.handle('db:clear-all-history', async () => {
+  try {
+    const count = clearAllHistory();
+    return { success: true, deleted: count };
+  } catch (err) {
+    console.error('IPC db:clear-all-history error:', err);
     throw err;
   }
 });

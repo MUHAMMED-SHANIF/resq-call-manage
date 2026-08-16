@@ -16,7 +16,11 @@ contextBridge.exposeInMainWorld('api', {
   approveCall: (callId, note, phones, groupId, placeGroup) => ipcRenderer.invoke('db:approve-call', callId, note, phones, groupId, placeGroup),
   rejectCall: (callId) => ipcRenderer.invoke('db:reject-call', callId),
   updateCallData: (callId, note, phones, placeGroup) => ipcRenderer.invoke('db:update-call-data', callId, note, phones, placeGroup),
-  getDuplicateHistory: (normalizedNumber) => ipcRenderer.invoke('db:get-duplicate-history', normalizedNumber),
+  getDuplicateHistory: (normalizedNumber, excludeCallId) => ipcRenderer.invoke('db:get-duplicate-history', normalizedNumber, excludeCallId),
   batchApproveCalls: (callIds, groupIdOrMap) => ipcRenderer.invoke('db:batch-approve-calls', callIds, groupIdOrMap),
-  updateAllPlaceGroups: (placesConfig) => ipcRenderer.invoke('db:update-all-place-groups', placesConfig)
+  updateAllPlaceGroups: (placesConfig) => ipcRenderer.invoke('db:update-all-place-groups', placesConfig),
+
+  // History Deletion APIs
+  deleteHistoryCall: (callId) => ipcRenderer.invoke('db:delete-history-call', callId),
+  clearAllHistory: () => ipcRenderer.invoke('db:clear-all-history'),
 });

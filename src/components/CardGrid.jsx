@@ -47,6 +47,7 @@ export default function CardGrid({
             note={card.notes || ''}
             phones={card.phoneNumbers ? card.phoneNumbers.split(', ') : ['']}
             isDuplicate={card.isDuplicate}
+            duplicateNumberTrigger={card.duplicateNumberTrigger}
             whatsappStatus={card.whatsappStatus}
             onUpdateNote={(text) => onUpdateNote(card.id, text)}
             onUpdatePhones={(phonesList) => onUpdatePhones(card.id, phonesList)}

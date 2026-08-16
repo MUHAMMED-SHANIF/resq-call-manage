@@ -23,10 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 
-# Electron build output
-release/
-
 # Runtime database files
 *.db
 *.db-shm
 *.db-wal
+
+# Unpacked Electron build (keep only the installer exe)
+release/win-unpacked/

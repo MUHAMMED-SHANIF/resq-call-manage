@@ -9,6 +9,7 @@ export default function DataCard({
   note = '', 
   phones = [''], // Array of strings (phone numbers list)
   isDuplicate = false,
+  duplicateNumberTrigger = null,
   whatsappStatus = 'not_sent',
   onUpdateNote, 
   onUpdatePhones,
@@ -87,12 +88,12 @@ export default function DataCard({
     }
   };
 
-  // Find first valid phone number to open history modal with
+  // Find exact duplicate number to open history modal with
   const handleHistoryClick = () => {
-    const firstDup = phones.find(p => p.trim() !== '');
-    if (firstDup && onShowDuplicateHistory) {
+    const trigger = duplicateNumberTrigger || phones.find(p => p.trim() !== '');
+    if (trigger && onShowDuplicateHistory) {
       // Pass both the number AND the card's db id so parent can wire up Approve Anyway
-      onShowDuplicateHistory(firstDup, cardId);
+      onShowDuplicateHistory(trigger, cardId);
     }
   };
 
@@ -105,29 +106,6 @@ export default function DataCard({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
           <span className="card-index">#{index}</span>
-          
-          {isDuplicate && (
-            <span 
-              className="badge badge-error" 
-              onClick={handleHistoryClick}
-              title="Click to view call history & approve if needed"
-              style={{ 
-                fontSize: '0.6rem', 
-                padding: '0.15rem 0.5rem', 
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-                animation: 'pulse 2s infinite',
-                borderRadius: '4px',
-                fontWeight: 700,
-                userSelect: 'none'
-              }}
-            >
-              <ShieldAlert size={10} />
-              <span>Duplicate</span>
-            </span>
-          )}
         </div>
 
         {/* Action Buttons Row — icon only */}
@@ -156,6 +134,32 @@ export default function DataCard({
           >
             {copied ? <Check size={13} /> : <Copy size={13} />}
           </button>
+
+          {/* Duplicate Button — Replaces Approve when duplicate */}
+          {isDuplicate && !isHistoric && (
+            <button
+              type="button"
+              className="card-action-btn"
+              onClick={handleHistoryClick}
+              title="Click to view call history & approve if needed"
+              style={{
+                backgroundColor: '#fee2e2',
+                color: '#dc2626',
+                borderColor: '#fca5a5',
+                animation: 'pulse 2s infinite',
+                width: 'auto',
+                padding: '0 0.5rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                fontWeight: 700,
+                fontSize: '0.65rem'
+              }}
+            >
+              <ShieldAlert size={13} />
+              <span>Duplicate</span>
+            </button>
+          )}
 
           {/* Approve Button — HIDDEN when duplicate OR historic */}
           {!isDuplicate && !isHistoric && (

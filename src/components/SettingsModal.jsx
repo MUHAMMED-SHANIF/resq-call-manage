@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Save, Info, MapPin, Plus, Trash2 } from 'lucide-react';
+import { X, Save, Info, MapPin, Plus, Trash2, ShieldAlert, Lock, AlertTriangle } from 'lucide-react';
 
 export default function SettingsModal({ 
   isOpen, 
@@ -9,7 +9,8 @@ export default function SettingsModal({
   sheetName, 
   sheetNames,
   placesConfig = [],
-  onSave 
+  onSave,
+  onClearHistorySuccess
 }) {
   const [site, setSite] = useState(siteFilter);
   const [statusesText, setStatusesText] = useState(statusFilters.join(', '));
@@ -24,6 +25,88 @@ export default function SettingsModal({
   });
 
   const [validationError, setValidationError] = useState(null);
+
+  // Danger Zone: Clear All History
+  // Steps: 'idle' | 'confirm' | 'type' | 'password' | 'clearing'
+  const [clearStep, setClearStep] = useState('idle');
+  const [confirmText, setConfirmText] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [clearError, setClearError] = useState('');
+  const [clearSuccess, setClearSuccess] = useState('');
+
+  // Danger Zone: Set/Change Password
+  const [showSetPassword, setShowSetPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
+  const [passwordSaveMsg, setPasswordSaveMsg] = useState('');
+
+  const dangerPassword = localStorage.getItem('cc_danger_password') || '';
+
+  const handleClearHistoryClick = () => {
+    setClearStep('confirm');
+    setClearError('');
+    setClearSuccess('');
+    setConfirmText('');
+    setPasswordInput('');
+  };
+
+  const handleClearStep1 = () => {
+    if (confirmText.trim().toUpperCase() !== 'DELETE ALL') {
+      setClearError('You must type DELETE ALL exactly to proceed.');
+      return;
+    }
+    setClearError('');
+    if (dangerPassword) {
+      setClearStep('password');
+    } else {
+      handleClearConfirmed();
+    }
+  };
+
+  const handleClearStep2 = () => {
+    if (passwordInput !== dangerPassword) {
+      setClearError('Incorrect password. History was NOT cleared.');
+      return;
+    }
+    handleClearConfirmed();
+  };
+
+  const handleClearConfirmed = async () => {
+    setClearStep('clearing');
+    setClearError('');
+    try {
+      if (window.api) {
+        const result = await window.api.clearAllHistory();
+        setClearSuccess(`Done! ${result.deleted} history records deleted.`);
+      } else {
+        setClearSuccess('[Mock] History cleared (no DB in browser mode).');
+      }
+      setClearStep('idle');
+      setConfirmText('');
+      setPasswordInput('');
+      if (onClearHistorySuccess) onClearHistorySuccess();
+    } catch (err) {
+      setClearError(`Error: ${err.message || err}`);
+      setClearStep('idle');
+    }
+  };
+
+  const handleSavePassword = () => {
+    if (newPassword !== newPasswordConfirm) {
+      setPasswordSaveMsg('Passwords do not match.');
+      return;
+    }
+    if (newPassword.trim() === '') {
+      localStorage.removeItem('cc_danger_password');
+      setPasswordSaveMsg('Password removed. History can be cleared without a password.');
+    } else {
+      localStorage.setItem('cc_danger_password', newPassword);
+      setPasswordSaveMsg('Password saved successfully.');
+    }
+    setNewPassword('');
+    setNewPasswordConfirm('');
+    setTimeout(() => setPasswordSaveMsg(''), 3000);
+  };
 
   if (!isOpen) return null;
 
@@ -256,6 +339,127 @@ export default function SettingsModal({
               <span>
                 Settings are saved in local storage. Changing place names or pincodes will immediately re-categorize both active pending lists and historical data records.
               </span>
+            </div>
+
+            {/* ═══ DANGER ZONE ═══ */}
+            <hr style={{ border: '0', borderTop: '2px solid #fca5a5', margin: '0.5rem 0' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <h4 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#dc2626', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <ShieldAlert size={16} />
+                Danger Zone
+              </h4>
+
+              {/* Clear All History */}
+              {clearStep === 'idle' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {clearSuccess && (
+                    <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '4px', padding: '0.4rem 0.65rem' }}>
+                      ✓ {clearSuccess}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 'var(--radius-sm)', padding: '0.75rem 1rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#991b1b' }}>Clear All History</div>
+                      <div style={{ fontSize: '0.7rem', color: '#b91c1c', marginTop: '0.15rem' }}>Permanently deletes all approved &amp; rejected records. Cannot be undone.</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleClearHistoryClick}
+                      style={{ flexShrink: 0, background: '#dc2626', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.4rem 0.85rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                    >
+                      <Trash2 size={13} /> Clear History
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 1 — Type DELETE ALL */}
+              {(clearStep === 'confirm') && (
+                <div style={{ background: '#fef2f2', border: '1px solid #f87171', borderRadius: 'var(--radius-sm)', padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#991b1b', fontWeight: 700, fontSize: '0.8rem' }}>
+                    <AlertTriangle size={14} /> Confirm Deletion — Step 1 of {dangerPassword ? 2 : 1}
+                  </div>
+                  <p style={{ fontSize: '0.72rem', color: '#b91c1c', margin: 0 }}>This will permanently erase ALL approved and rejected call records. Type <strong>DELETE ALL</strong> below to confirm.</p>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Type: DELETE ALL"
+                    value={confirmText}
+                    onChange={e => { setConfirmText(e.target.value); setClearError(''); }}
+                    style={{ fontSize: '0.8rem', padding: '0.4rem 0.6rem', borderColor: '#f87171' }}
+                    autoFocus
+                  />
+                  {clearError && <div style={{ fontSize: '0.7rem', color: '#dc2626', fontWeight: 600 }}>{clearError}</div>}
+                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                    <button type="button" onClick={() => { setClearStep('idle'); setClearError(''); }} style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', background: '#e2e8f0', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, color: '#475569' }}>Cancel</button>
+                    <button type="button" onClick={handleClearStep1} style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}>Continue →</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2 — Password (only if set) */}
+              {clearStep === 'password' && (
+                <div style={{ background: '#fef2f2', border: '1px solid #f87171', borderRadius: 'var(--radius-sm)', padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#991b1b', fontWeight: 700, fontSize: '0.8rem' }}>
+                    <Lock size={14} /> Confirm Deletion — Step 2 of 2
+                  </div>
+                  <p style={{ fontSize: '0.72rem', color: '#b91c1c', margin: 0 }}>Enter the danger-zone password to proceed.</p>
+                  <input
+                    type="password"
+                    className="form-input"
+                    placeholder="Enter password"
+                    value={passwordInput}
+                    onChange={e => { setPasswordInput(e.target.value); setClearError(''); }}
+                    style={{ fontSize: '0.8rem', padding: '0.4rem 0.6rem', borderColor: '#f87171' }}
+                    autoFocus
+                  />
+                  {clearError && <div style={{ fontSize: '0.7rem', color: '#dc2626', fontWeight: 600 }}>{clearError}</div>}
+                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                    <button type="button" onClick={() => { setClearStep('idle'); setClearError(''); }} style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', background: '#e2e8f0', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, color: '#475569' }}>Cancel</button>
+                    <button type="button" onClick={handleClearStep2} style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}>Delete All →</button>
+                  </div>
+                </div>
+              )}
+
+              {clearStep === 'clearing' && (
+                <div style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 700, textAlign: 'center', padding: '0.75rem' }}>Clearing history...</div>
+              )}
+
+              {/* Set / Change Password */}
+              <div style={{ borderTop: '1px dashed #fca5a5', paddingTop: '0.65rem' }}>
+                <button
+                  type="button"
+                  onClick={() => { setShowSetPassword(p => !p); setPasswordSaveMsg(''); }}
+                  style={{ fontSize: '0.72rem', fontWeight: 700, color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', padding: 0 }}
+                >
+                  <Lock size={12} /> {dangerPassword ? 'Change Danger-Zone Password' : 'Set Danger-Zone Password (optional)'}
+                </button>
+
+                {showSetPassword && (
+                  <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <input
+                      type="password"
+                      className="form-input"
+                      placeholder="New password (leave blank to remove)"
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                    />
+                    <input
+                      type="password"
+                      className="form-input"
+                      placeholder="Confirm new password"
+                      value={newPasswordConfirm}
+                      onChange={e => setNewPasswordConfirm(e.target.value)}
+                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }}
+                    />
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <button type="button" onClick={handleSavePassword} style={{ fontSize: '0.72rem', padding: '0.3rem 0.65rem', background: '#b91c1c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}>Save Password</button>
+                      {passwordSaveMsg && <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 600 }}>{passwordSaveMsg}</span>}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           

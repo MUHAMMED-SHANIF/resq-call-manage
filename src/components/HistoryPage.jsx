@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { Download, Search, Calendar, Filter, FileText } from 'lucide-react';
+import { Download, Search, Calendar, Filter, FileText, Trash2 } from 'lucide-react';
 
 export default function HistoryPage({ placesList = [] }) {
   const [calls, setCalls] = useState([]);
@@ -15,6 +15,10 @@ export default function HistoryPage({ placesList = [] }) {
   const [selectedOrderType, setSelectedOrderType] = useState('All');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  // Row-level delete confirmation state (stores the id of the row awaiting confirm)
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [deleteError, setDeleteError] = useState(null);
 
   // Dropdown lists
   const [orderTypes, setOrderTypes] = useState([]);
@@ -54,6 +58,19 @@ export default function HistoryPage({ placesList = [] }) {
   useEffect(() => {
     fetchHistoryCalls();
   }, []);
+
+  const handleDeleteCall = async (callId) => {
+    if (!window.api) return;
+    setDeleteError(null);
+    try {
+      await window.api.deleteHistoryCall(callId);
+      setPendingDeleteId(null);
+      fetchHistoryCalls();
+    } catch (err) {
+      setDeleteError(`Failed to delete: ${err.message || err}`);
+      setPendingDeleteId(null);
+    }
+  };
 
   // Filter logic
   const filteredCalls = calls.filter(item => {
@@ -325,6 +342,7 @@ export default function HistoryPage({ placesList = [] }) {
                   <th style={{ padding: '0.75rem 0.5rem', width: '180px' }}>Remarks</th>
                   <th style={{ padding: '0.75rem 0.5rem', width: '110px' }}>Start Date</th>
                   <th style={{ padding: '0.75rem 0.5rem', width: '110px' }}>Action Date</th>
+                  <th style={{ padding: '0.75rem 0.5rem', width: '60px', textAlign: 'center' }}>Del</th>
                 </tr>
               </thead>
               <tbody>
@@ -390,6 +408,38 @@ export default function HistoryPage({ placesList = [] }) {
                       {/* Action Date */}
                       <td style={{ padding: '0.75rem 0.5rem', color: 'var(--text-secondary)' }}>
                         {actionDate ? new Date(actionDate).toLocaleString('en-IN') : '—'}
+                      </td>
+
+                      {/* Delete Action */}
+                      <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                        {pendingDeleteId === item.id ? (
+                          <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'center' }}>
+                            <button
+                              onClick={() => handleDeleteCall(item.id)}
+                              title="Confirm delete"
+                              style={{ fontSize: '0.6rem', fontWeight: 700, background: '#dc2626', color: '#fff', border: 'none', borderRadius: '3px', padding: '0.15rem 0.35rem', cursor: 'pointer' }}
+                            >
+                              Yes
+                            </button>
+                            <button
+                              onClick={() => setPendingDeleteId(null)}
+                              title="Cancel"
+                              style={{ fontSize: '0.6rem', fontWeight: 700, background: '#e2e8f0', color: '#475569', border: 'none', borderRadius: '3px', padding: '0.15rem 0.35rem', cursor: 'pointer' }}
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setPendingDeleteId(item.id)}
+                            title="Delete this history record"
+                            style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', opacity: 0.6, display: 'inline-flex', padding: '0.25rem' }}
+                            onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                            onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

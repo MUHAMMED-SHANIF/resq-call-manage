@@ -6,6 +6,7 @@ export default function DuplicateHistoryModal({
   onClose, 
   normalizedNumber,
   currentServiceOrder = null,  // service order of the card being reviewed
+  currentCallId = null,        // db id of the card being reviewed
   onApproveAnyway = null        // callback to approve this card despite duplicate
 }) {
   const [history, setHistory] = useState([]);
@@ -20,7 +21,7 @@ export default function DuplicateHistoryModal({
       setLoading(false);
       return;
     }
-    window.api.getDuplicateHistory(normalizedNumber)
+    window.api.getDuplicateHistory(normalizedNumber, currentCallId)
       .then(data => {
         setHistory(data || []);
       })
@@ -104,12 +105,13 @@ export default function DuplicateHistoryModal({
                     let statusBadgeClass = 'badge-info';
                     if (item.status === 'approved') statusBadgeClass = 'badge-success';
                     if (item.status === 'rejected') statusBadgeClass = 'badge-error';
+                    if (item.status === 'pending') statusBadgeClass = 'badge-warning';
 
                     const actionDate = item.status === 'approved' 
                       ? item.approved_date 
                       : item.status === 'rejected' 
                         ? item.rejected_date 
-                        : null;
+                        : item.created_on;
 
                     // Highlight rows that match the current service order
                     const isSameId = currentServiceOrder && String(item.request_id) === String(currentServiceOrder);
