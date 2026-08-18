@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, AlertTriangle, Layers, QrCode } from 'lucide-react';
+import { Check, AlertTriangle, Layers, QrCode, X, FileText } from 'lucide-react';
 import Dropzone from './components/Dropzone';
 import CardGrid from './components/CardGrid';
 import FilterBar from './components/FilterBar';
@@ -9,7 +9,9 @@ import NavBar from './components/NavBar';
 import HistoryPage from './components/HistoryPage';
 import DuplicateHistoryModal from './components/DuplicateHistoryModal';
 import { extractSheetData, parseExcelWorkbook } from './utils/excelParser';
+import { parseCsvData } from './utils/csvParser';
 import { DEFAULT_SITE, DEFAULT_STATUSES, DEFAULT_SHEET, getGroupsForPincodeDynamic } from './config';
+import { ALL_USER_STATUSES } from './components/FilterBar';
 
 export default function App() {
   // Navigation Routing State
@@ -55,6 +57,10 @@ export default function App() {
   const [activePlaceTab, setActivePlaceTab] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [cardStatusFilter, setCardStatusFilter] = useState('all'); // 'all' | 'pending' | 'approved' | 'rejected'
+
+  // CSV description modal state
+  const [csvPendingData, setCsvPendingData] = useState(null); // { csvText, name } when CSV is staged
+  const [csvDescription, setCsvDescription] = useState('');
 
   // Modal Overlays toggle states
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -132,13 +138,21 @@ export default function App() {
   // ----------------------------------------------------
   // Excel File Parsing & Database Import
   // ----------------------------------------------------
-  const handleFileLoaded = (arrayBuffer, name) => {
+  const handleFileLoaded = (fileData, name, fileType = 'excel') => {
     setErrorMessage(null);
-    setIsProcessing(true);
 
+    if (fileType === 'csv') {
+      // Stage the CSV and show the description modal
+      setCsvPendingData({ csvText: fileData, name });
+      setCsvDescription('');
+      return;
+    }
+
+    // Excel path
+    setIsProcessing(true);
     setTimeout(async () => {
       try {
-        const wb = parseExcelWorkbook(arrayBuffer);
+        const wb = parseExcelWorkbook(fileData);
         setWorkbook(wb);
         setSheetNames(wb.SheetNames);
         setFileName(name);
@@ -154,7 +168,7 @@ export default function App() {
           wb,
           targetSheet,
           siteFilter,
-          statusFilters,
+          statusFilters.length === 0 ? ALL_USER_STATUSES : statusFilters,
           placesConfig
         );
 
@@ -174,7 +188,9 @@ export default function App() {
               notes: '',
               phoneNumbers: '',
               isDuplicate: false,
-              whatsappStatus: 'not_sent'
+              whatsappStatus: 'not_sent',
+              warrantyStatus: null,
+              amount: ''
             })));
             addToast(`[Mock] Loaded ${filteredRows.length} calls in browser.`);
           }
@@ -187,6 +203,60 @@ export default function App() {
         setIsProcessing(false);
       }
     }, 100);
+  };
+
+  // Confirm CSV import with the user-entered description
+  const handleCsvImportConfirm = async () => {
+    if (!csvPendingData) return;
+    setIsProcessing(true);
+    setCsvPendingData(null);
+
+    try {
+      const { filteredRows } = parseCsvData(
+        csvPendingData.csvText,
+        siteFilter,
+        statusFilters.length === 0 ? ALL_USER_STATUSES : statusFilters,
+        placesConfig,
+        csvDescription.trim()
+      );
+
+      setFileName(csvPendingData.name);
+      localStorage.setItem('cc_active_file_name', csvPendingData.name);
+
+      if (filteredRows.length === 0) {
+        addToast('No CSV rows matched target Site and User Statuses.', true);
+      } else {
+        if (window.api) {
+          await window.api.importCalls(filteredRows);
+          addToast(`Imported ${filteredRows.length} calls from CSV successfully!`);
+          loadPendingCalls();
+        } else {
+          setPendingCalls(filteredRows.map((r, i) => ({
+            ...r,
+            id: i + 1,
+            notes: '',
+            phoneNumbers: '',
+            isDuplicate: false,
+            whatsappStatus: 'not_sent',
+            warrantyStatus: null,
+            amount: ''
+          })));
+          addToast(`[Mock] Loaded ${filteredRows.length} CSV calls in browser.`);
+        }
+        setShowDropzone(false);
+      }
+    } catch (err) {
+      console.error('[CSV Import Error]', err);
+      setErrorMessage(`Failed to parse CSV: ${err.message || err}`);
+    } finally {
+      setIsProcessing(false);
+      setCsvDescription('');
+    }
+  };
+
+  const handleCsvImportCancel = () => {
+    setCsvPendingData(null);
+    setCsvDescription('');
   };
 
   // Show dropzone manually to import additional work orders
@@ -221,6 +291,24 @@ export default function App() {
           loadPendingCalls(); // Refresh data to dynamically recalculate duplicate indicators
         })
         .catch(err => console.error('Error saving updated phones:', err));
+    }
+  };
+
+  // Persists warranty status to DB
+  const handleUpdateWarranty = (callId, warrantyStatus) => {
+    setPendingCalls(prev => prev.map(c => c.id === callId ? { ...c, warrantyStatus } : c));
+    if (window.api) {
+      window.api.updateWarrantyStatus(callId, warrantyStatus)
+        .catch(err => console.error('Error saving warranty status:', err));
+    }
+  };
+
+  // Persists amount to DB
+  const handleUpdateAmount = (callId, amount) => {
+    setPendingCalls(prev => prev.map(c => c.id === callId ? { ...c, amount } : c));
+    if (window.api) {
+      window.api.updateAmount(callId, amount)
+        .catch(err => console.error('Error saving amount:', err));
     }
   };
 
@@ -320,12 +408,10 @@ export default function App() {
   // Save Settings Config
   const handleSaveSettings = (settings) => {
     setSiteFilter(settings.site);
-    setStatusFilters(settings.statuses);
     setSheetName(settings.sheetName);
     setPlacesConfig(settings.places);
 
     localStorage.setItem('cc_site_filter', settings.site);
-    localStorage.setItem('cc_status_filters', JSON.stringify(settings.statuses));
     localStorage.setItem('cc_sheet_name', settings.sheetName);
     localStorage.setItem('cc_places_config', JSON.stringify(settings.places));
 
@@ -346,9 +432,23 @@ export default function App() {
     }
   };
 
+  // When status filter changes in FilterBar, persist to localStorage
+  const handleSetStatusFilters = (newFilters) => {
+    setStatusFilters(newFilters);
+    localStorage.setItem('cc_status_filters', JSON.stringify(newFilters));
+  };
+
   // ----------------------------------------------------
   // Local Filtering Logic (Pending Views)
   // ----------------------------------------------------
+
+  // Normalize status for comparison (same logic as parser)
+  const normalizeStatus = (str) =>
+    String(str)
+      .replace(/\u00A0/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
 
   // Counts based on place groups for active pending calls
   const placeCounts = {
@@ -373,6 +473,12 @@ export default function App() {
     }
   });
 
+  // Normalized list of active status filters for live card filtering
+  const activeStatusFiltersNorm =
+    statusFilters.length === 0
+      ? [] // empty = all visible
+      : statusFilters.map(s => normalizeStatus(s));
+
   const finalFilteredPending = pendingCalls.filter(call => {
     // 0. Filter by card status tab
     if (cardStatusFilter !== 'all') {
@@ -380,14 +486,20 @@ export default function App() {
       if (callStatus !== cardStatusFilter) return false;
     }
 
-    // 1. Filter by active place group dropdown option
+    // 1. Filter by User Status dropdown (live filtering on originalStatus)
+    if (activeStatusFiltersNorm.length > 0 && call.originalStatus) {
+      const cardNorm = normalizeStatus(call.originalStatus);
+      if (!activeStatusFiltersNorm.includes(cardNorm)) return false;
+    }
+
+    // 2. Filter by active place group dropdown option
     if (activePlaceTab !== 'All') {
       if (!call.groups || !call.groups.includes(activePlaceTab)) {
         return false;
       }
     }
 
-    // 2. Filter by search input query
+    // 3. Filter by search input query
     const q = searchQuery.trim().toLowerCase();
     if (q === '') return true;
 
@@ -464,7 +576,7 @@ export default function App() {
           <div className="loading-spinner"></div>
           <div style={{ textAlign: 'center' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
-              Processing Excel Database...
+              Processing Database...
             </h3>
             <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
               Parsing workbook tables, normalising headings, and resolving duplicate lists.
@@ -517,6 +629,7 @@ export default function App() {
                 totalCount={pendingCalls.length}
                 siteFilter={siteFilter}
                 statusFilters={statusFilters}
+                setStatusFilters={handleSetStatusFilters}
                 onResetFile={handleImportNewFile}
                 cardStatusFilter={cardStatusFilter}
                 setCardStatusFilter={setCardStatusFilter}
@@ -544,6 +657,8 @@ export default function App() {
                   setIsHistoryModalOpen(true);
                 }}
                 onCopyToast={addToast}
+                onUpdateWarranty={handleUpdateWarranty}
+                onUpdateAmount={handleUpdateAmount}
               />
             </div>
           )
@@ -552,6 +667,49 @@ export default function App() {
         {currentView === 'history' && <HistoryPage placesList={placesConfig} />}
 
       </main>
+
+      {/* CSV Description Modal */}
+      {csvPendingData && (
+        <div className="modal-overlay" onClick={handleCsvImportCancel}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px', width: '95%' }}>
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <FileText size={18} />
+                CSV Import — Add Description
+              </h3>
+              <button className="modal-close-btn" onClick={handleCsvImportCancel} aria-label="Cancel CSV import">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', lineHeight: 1.5 }}>
+                CSV files don't include a product description column. Enter a description below that will be applied to all imported cards from <strong>{csvPendingData.name}</strong>.
+              </p>
+              <div className="form-group">
+                <label className="form-label" style={{ fontSize: '0.75rem' }}>Product Description</label>
+                <textarea
+                  className="form-input"
+                  placeholder="e.g. Samsung Galaxy A15 — Screen Replacement..."
+                  value={csvDescription}
+                  onChange={(e) => setCsvDescription(e.target.value)}
+                  rows={3}
+                  style={{ fontSize: '0.8rem', padding: '0.5rem 0.75rem', resize: 'vertical' }}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={handleCsvImportCancel}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleCsvImportConfirm}>
+                <Check size={16} />
+                <span>Import CSV</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal overlays stack */}
       <SettingsModal 

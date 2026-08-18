@@ -19,22 +19,37 @@ export default function Dropzone({ onFileLoaded, onError, errorMessage }) {
     if (!file) return;
 
     const extension = file.name.split('.').pop().toLowerCase();
-    if (extension !== 'xlsx' && extension !== 'xlsb' && extension !== 'xls') {
-      onError('Invalid file format. Please upload a standard Excel file (.xlsx, .xlsb, or .xls).');
+    const isExcel = ['xlsx', 'xlsb', 'xls'].includes(extension);
+    const isCsv = extension === 'csv';
+
+    if (!isExcel && !isCsv) {
+      onError('Invalid file format. Please upload an Excel file (.xlsx, .xlsb, .xls) or a CSV file (.csv).');
       return;
     }
 
     onError(null); // Clear errors
-    
-    // Read the file as ArrayBuffer
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      onFileLoaded(e.target.result, file.name);
-    };
-    reader.onerror = () => {
-      onError('Failed to read the file. It might be corrupted or open in another application.');
-    };
-    reader.readAsArrayBuffer(file);
+
+    if (isCsv) {
+      // Read CSV as text
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        onFileLoaded(e.target.result, file.name, 'csv');
+      };
+      reader.onerror = () => {
+        onError('Failed to read the CSV file. It might be corrupted or open in another application.');
+      };
+      reader.readAsText(file, 'UTF-8');
+    } else {
+      // Read Excel as ArrayBuffer
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        onFileLoaded(e.target.result, file.name, 'excel');
+      };
+      reader.onerror = () => {
+        onError('Failed to read the file. It might be corrupted or open in another application.');
+      };
+      reader.readAsArrayBuffer(file);
+    }
   };
 
   const handleDrop = (e) => {
@@ -72,7 +87,7 @@ export default function Dropzone({ onFileLoaded, onError, errorMessage }) {
           ref={fileInputRef}
           type="file" 
           id="excel-file-input" 
-          accept=".xlsx,.xlsb,.xls" 
+          accept=".xlsx,.xlsb,.xls,.csv" 
           style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0, opacity: 0 }}
           onChange={handleChange}
         />
@@ -81,9 +96,9 @@ export default function Dropzone({ onFileLoaded, onError, errorMessage }) {
           <Upload size={32} />
         </div>
         
-        <h3 className="upload-title">Upload Excel Database</h3>
+        <h3 className="upload-title">Upload Excel or CSV Database</h3>
         <p className="upload-subtitle">
-          Drag and drop your <strong>.xlsx</strong> or <strong>.xlsb</strong> file here, or click to browse files
+          Drag and drop your <strong>.xlsx</strong>, <strong>.xlsb</strong>, or <strong>.csv</strong> file here, or click to browse files
         </p>
         
         <button type="button" className="btn btn-secondary">

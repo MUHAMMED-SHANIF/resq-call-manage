@@ -23,4 +23,8 @@ contextBridge.exposeInMainWorld('api', {
   // History Deletion APIs
   deleteHistoryCall: (callId) => ipcRenderer.invoke('db:delete-history-call', callId),
   clearAllHistory: () => ipcRenderer.invoke('db:clear-all-history'),
+
+  // Card Extra Fields
+  updateWarrantyStatus: (callId, warrantyStatus) => ipcRenderer.invoke('db:update-warranty-status', callId, warrantyStatus),
+  updateAmount: (callId, amount) => ipcRenderer.invoke('db:update-amount', callId, amount),
 });

@@ -13,7 +13,6 @@ export default function SettingsModal({
   onClearHistorySuccess
 }) {
   const [site, setSite] = useState(siteFilter);
-  const [statusesText, setStatusesText] = useState(statusFilters.join(', '));
   const [selectedSheet, setSelectedSheet] = useState(sheetName);
   
   // Local state for dynamic places table editing
@@ -139,12 +138,6 @@ export default function SettingsModal({
       }
     }
 
-    // Parse statuses from comma-separated list
-    const parsedStatuses = statusesText
-      .split(',')
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
-
     // Map dynamic places back to arrays
     const mappedPlaces = places.map(p => ({
       name: p.name.trim(),
@@ -153,7 +146,6 @@ export default function SettingsModal({
 
     onSave({
       site: site.trim(),
-      statuses: parsedStatuses,
       sheetName: selectedSheet,
       places: mappedPlaces
     });
@@ -214,19 +206,8 @@ export default function SettingsModal({
                 />
               </div>
 
-              {/* User Statuses */}
-              <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                <label className="form-label" style={{ fontSize: '0.75rem' }}>Included User Statuses (comma-separated)</label>
-                <input 
-                  type="text"
-                  className="form-input" 
-                  placeholder="e.g. Assigned/WIP, Released to WFM" 
-                  value={statusesText} 
-                  onChange={(e) => setStatusesText(e.target.value)}
-                  style={{ fontSize: '0.8rem', padding: '0.5rem 0.75rem' }}
-                />
-              </div>
             </div>
+            
 
             <hr style={{ border: '0', borderTop: '1px solid var(--border-color)', margin: '0.5rem 0' }} />
 

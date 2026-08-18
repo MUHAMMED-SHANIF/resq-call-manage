@@ -9,7 +9,9 @@ export default function CardGrid({
   onUpdatePhones, 
   onApprove, 
   onReject, 
-  onShowDuplicateHistory 
+  onShowDuplicateHistory,
+  onUpdateWarranty,
+  onUpdateAmount
 }) {
   const [visibleCount, setVisibleCount] = useState(100);
 
@@ -49,12 +51,16 @@ export default function CardGrid({
             isDuplicate={card.isDuplicate}
             duplicateNumberTrigger={card.duplicateNumberTrigger}
             whatsappStatus={card.whatsappStatus}
+            warrantyStatus={card.warrantyStatus || null}
+            amount={card.amount || ''}
             onUpdateNote={(text) => onUpdateNote(card.id, text)}
             onUpdatePhones={(phonesList) => onUpdatePhones(card.id, phonesList)}
             onApprove={() => onApprove(card.id)}
             onReject={() => onReject(card.id)}
             onShowDuplicateHistory={onShowDuplicateHistory}
             onCopyToast={onCopyToast}
+            onUpdateWarranty={(status) => onUpdateWarranty(card.id, status)}
+            onUpdateAmount={(amt) => onUpdateAmount(card.id, amt)}
           />
         ))}
       </div>

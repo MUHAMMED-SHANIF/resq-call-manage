@@ -1055,3 +1055,24 @@ body {
   50% { opacity: 0.75; }
 }
 
+
+/* Warranty Toggle Buttons */
+.warranty-toggle-row { display: flex; gap: 0.35rem; margin: 0.25rem 0; }
+.warranty-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; font-family: var(--font-family); font-size: 0.65rem; font-weight: 700; padding: 0.3rem 0.4rem; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color); background-color: var(--bg-primary); color: var(--text-muted); cursor: pointer; transition: all var(--transition-fast); white-space: nowrap; }
+.warranty-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+.warranty-btn:not(:disabled):hover { border-color: #94a3b8; color: var(--text-primary); background-color: var(--bg-hover); }
+.warranty-btn--in.active { background-color: #dcfce7; border-color: #22c55e; color: #15803d; box-shadow: 0 0 0 2px rgba(34,197,94,0.15); }
+.warranty-btn--in.active:not(:disabled):hover { background-color: #bbf7d0; border-color: #16a34a; color: #14532d; }
+.warranty-btn--out.active { background-color: #fff7ed; border-color: #f97316; color: #c2410c; box-shadow: 0 0 0 2px rgba(249,115,22,0.15); }
+.warranty-btn--out.active:not(:disabled):hover { background-color: #fed7aa; border-color: #ea580c; color: #9a3412; }
+
+/* User Status Filter Dropdown */
+.status-filter-dropdown { position: relative; }
+.status-filter-btn.active { border-color: var(--color-accent); background-color: var(--color-accent-light); color: var(--color-accent); }
+.status-filter-panel { position: absolute; top: calc(100% + 6px); right: 0; min-width: 230px; background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); z-index: 200; padding: 0.4rem 0; animation: slideUp 0.15s cubic-bezier(0.16,1,0.3,1); max-height: 320px; overflow-y: auto; }
+.status-filter-option { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0.875rem; font-size: 0.78rem; font-weight: 500; color: var(--text-primary); cursor: pointer; user-select: none; transition: background-color var(--transition-fast); }
+.status-filter-option:hover { background-color: var(--bg-hover); }
+.status-filter-option--all { font-weight: 700; color: var(--text-secondary); }
+.status-filter-divider { height: 1px; background-color: var(--border-color); margin: 0.25rem 0; }
+.status-checkbox { width: 15px; height: 15px; flex-shrink: 0; border: 1.5px solid #cbd5e1; border-radius: 3px; background-color: var(--bg-primary); display: inline-flex; align-items: center; justify-content: center; transition: all var(--transition-fast); color: #fff; }
+.status-checkbox.checked { background-color: var(--color-accent); border-color: var(--color-accent); }

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Copy, Check, PlusCircle, MinusCircle, Trash2, CheckCircle2, ShieldAlert } from 'lucide-react';
+import React, { useState } from 'react';
+import { Copy, Check, PlusCircle, MinusCircle, Trash2, CheckCircle2, ShieldAlert, ShieldCheck, ShieldX } from 'lucide-react';
 import { normalizePhoneNumber, isValidPhoneNumber } from '../utils/phoneNormalizer';
 
 export default function DataCard({ 
@@ -11,12 +11,16 @@ export default function DataCard({
   isDuplicate = false,
   duplicateNumberTrigger = null,
   whatsappStatus = 'not_sent',
+  warrantyStatus = null,   // 'in' | 'out' | null
+  amount = '',             // amount string
   onUpdateNote, 
   onUpdatePhones,
   onApprove, 
   onReject, 
   onShowDuplicateHistory,
-  onCopyToast 
+  onCopyToast,
+  onUpdateWarranty,
+  onUpdateAmount
 }) {
   const [copied, setCopied] = useState(false);
   const isUp1 = String(cardData.cityBifurcation).toLowerCase().trim() === 'up1';
@@ -38,6 +42,18 @@ export default function DataCard({
   const handleRemovePhoneField = (idx) => {
     const updatedPhones = phones.filter((_, i) => i !== idx);
     onUpdatePhones(updatedPhones.length > 0 ? updatedPhones : ['']);
+  };
+
+  // Warranty toggle handler — clicking active one deselects it
+  const handleWarrantyToggle = (value) => {
+    if (isHistoric) return;
+    const next = warrantyStatus === value ? null : value;
+    if (onUpdateWarranty) onUpdateWarranty(next);
+  };
+
+  // Amount change handler
+  const handleAmountChange = (e) => {
+    if (onUpdateAmount) onUpdateAmount(e.target.value);
   };
 
   // Copy card details to clipboard
@@ -246,7 +262,47 @@ export default function DataCard({
           })}
         </div>
 
-        {/* 2. Remarks Notes Area */}
+        {/* 2. Warranty Toggle — In Wrty / Out Wrty (exclusive, locked after approve) */}
+        <div className="warranty-toggle-row">
+          <button
+            type="button"
+            className={`warranty-btn warranty-btn--in ${warrantyStatus === 'in' ? 'active' : ''}`}
+            onClick={() => handleWarrantyToggle('in')}
+            disabled={isHistoric}
+            title="In Warranty"
+          >
+            <ShieldCheck size={12} />
+            <span>In Wrty</span>
+          </button>
+          <button
+            type="button"
+            className={`warranty-btn warranty-btn--out ${warrantyStatus === 'out' ? 'active' : ''}`}
+            onClick={() => handleWarrantyToggle('out')}
+            disabled={isHistoric}
+            title="Out of Warranty"
+          >
+            <ShieldX size={12} />
+            <span>Out Wrty</span>
+          </button>
+        </div>
+
+        {/* 3. Amount Field */}
+        <div style={{ margin: '0.2rem 0' }}>
+          <span className="field-label" style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Amount (₹)</span>
+          <input
+            type="number"
+            className="card-phone-input"
+            placeholder="Enter amount..."
+            value={amount}
+            onChange={handleAmountChange}
+            disabled={isHistoric}
+            min="0"
+            step="0.01"
+            style={{ fontSize: '0.75rem', width: '100%', padding: '0.2rem 0.4rem', height: '26px', marginTop: '0.1rem' }}
+          />
+        </div>
+
+        {/* 4. Remarks Notes Area */}
         <div className="card-note-wrapper" style={{ margin: '0.25rem 0' }}>
           <span className="field-label" style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Remarks</span>
           <textarea

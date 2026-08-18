@@ -3,6 +3,19 @@ import { REQUIRED_FIELDS, FILTER_FIELDS, resolveColumnName, getGroupsForPincode,
 import { formatExcelDate } from './dateFormatter';
 
 /**
+ * Normalizes a status string exactly as Excel AutoFilter does:
+ * strips non-breaking spaces (U+00A0), collapses internal whitespace,
+ * trims leading/trailing spaces, then lowercases.
+ */
+function normalizeStatus(str) {
+  return String(str)
+    .replace(/\u00A0/g, ' ')  // non-breaking space → regular space
+    .replace(/\s+/g, ' ')      // multiple spaces → single space
+    .trim()
+    .toLowerCase();
+}
+
+/**
  * Parses the Excel file buffer using SheetJS.
  * Supports .xlsx, .xlsb, and .xls formats.
  * @param {ArrayBuffer} arrayBuffer 
@@ -62,10 +75,11 @@ export function extractSheetData(workbook, sheetName, siteFilter, statusFilters,
 
   // Convert raw rows to standardized rows containing only our needed columns
   const allRows = rawData.map((row, index) => {
+    const rawStatus = resolvedFilterMappings.userStatus ? String(row[resolvedFilterMappings.userStatus]) : '';
     const standardizedRow = {
       id: index,
       originalSite: resolvedFilterMappings.site ? String(row[resolvedFilterMappings.site]).trim() : '',
-      originalStatus: resolvedFilterMappings.userStatus ? String(row[resolvedFilterMappings.userStatus]).trim() : ''
+      originalStatus: normalizeStatus(rawStatus)
     };
 
     REQUIRED_FIELDS.forEach(field => {
@@ -118,18 +132,18 @@ export function extractSheetData(workbook, sheetName, siteFilter, statusFilters,
     return standardizedRow;
   });
 
-  // Apply filters
+  // Apply filters — uses normalizeStatus for exact Excel-equivalent matching
   const siteFilterLower = String(siteFilter).trim().toLowerCase();
-  const statusFiltersLower = statusFilters.map(s => String(s).trim().toLowerCase());
+  const statusFiltersNorm = statusFilters.map(s => normalizeStatus(s));
 
   const filteredRows = allRows.filter(row => {
     // Site code filter (if config code is set, match case-insensitively)
     const rowSite = row.originalSite.toLowerCase();
     const siteMatches = siteFilterLower === '' || rowSite === siteFilterLower;
 
-    // User status filter (if config statuses are set, match case-insensitively)
-    const rowStatus = row.originalStatus.toLowerCase();
-    const statusMatches = statusFiltersLower.length === 0 || statusFiltersLower.includes(rowStatus);
+    // User status filter — exact normalized match (like Excel AutoFilter)
+    const rowStatus = row.originalStatus; // already normalized above
+    const statusMatches = statusFiltersNorm.length === 0 || statusFiltersNorm.includes(rowStatus);
 
     return siteMatches && statusMatches;
   });

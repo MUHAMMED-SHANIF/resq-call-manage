@@ -169,7 +169,10 @@ export async function initDb() {
         rejected_date TEXT,
         whatsapp_status TEXT CHECK(whatsapp_status IN ('not_sent', 'sending', 'sent', 'failed')) DEFAULT 'not_sent',
         sent_at TEXT,
-        imported_at TEXT DEFAULT (datetime('now', 'localtime'))
+        imported_at TEXT DEFAULT (datetime('now', 'localtime')),
+        original_status TEXT,
+        warranty_status TEXT,
+        amount TEXT
       );
     `);
 
@@ -206,7 +209,10 @@ export async function initDb() {
       { name: 'rejected_date', def: 'ALTER TABLE calls ADD COLUMN rejected_date TEXT' },
       { name: 'whatsapp_status', def: "ALTER TABLE calls ADD COLUMN whatsapp_status TEXT CHECK(whatsapp_status IN ('not_sent', 'sending', 'sent', 'failed')) DEFAULT 'not_sent'" },
       { name: 'sent_at', def: 'ALTER TABLE calls ADD COLUMN sent_at TEXT' },
-      { name: 'imported_at', def: "ALTER TABLE calls ADD COLUMN imported_at TEXT DEFAULT (datetime('now', 'localtime'))" }
+      { name: 'imported_at', def: "ALTER TABLE calls ADD COLUMN imported_at TEXT DEFAULT (datetime('now', 'localtime'))" },
+      { name: 'original_status', def: 'ALTER TABLE calls ADD COLUMN original_status TEXT' },
+      { name: 'warranty_status', def: 'ALTER TABLE calls ADD COLUMN warranty_status TEXT' },
+      { name: 'amount', def: 'ALTER TABLE calls ADD COLUMN amount TEXT' }
     ];
 
     for (const m of migrations) {
@@ -262,6 +268,7 @@ export function importCalls(calls) {
       place_group = ?,
       request_start = ?,
       up_flag = ?,
+      original_status = ?,
       imported_at = ?
     WHERE id = ?
   `);
@@ -269,8 +276,8 @@ export function importCalls(calls) {
   const updateImportedAt = db.prepare(`UPDATE calls SET imported_at = ? WHERE id = ?`);
 
   const insertCall = db.prepare(`
-    INSERT INTO calls (request_id, order_type, sold_to_party, brand_name, product_description, pincode, place_group, request_start, up_flag, status, imported_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+    INSERT INTO calls (request_id, order_type, sold_to_party, brand_name, product_description, pincode, place_group, request_start, up_flag, status, original_status, imported_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
   `);
 
   const deletePhones = db.prepare(`DELETE FROM phone_numbers WHERE call_id = ?`);
@@ -297,6 +304,7 @@ export function importCalls(calls) {
             row.groups.join(','),
             row.createdOn,
             row.cityBifurcation.toLowerCase().trim() === 'up1' ? 1 : 0,
+            row.originalStatus || null,
             now,
             targetCallId
           );
@@ -319,6 +327,8 @@ export function importCalls(calls) {
           row.groups.join(','),
           row.createdOn,
           row.cityBifurcation.toLowerCase().trim() === 'up1' ? 1 : 0,
+          'pending',
+          row.originalStatus || null,
           now
         );
         const newCall = db.prepare(`SELECT id FROM calls WHERE request_id = ? ORDER BY id DESC LIMIT 1`).get(row.serviceOrder);
@@ -391,6 +401,9 @@ export function getPendingCalls() {
       c.request_start as createdOn,
       c.up_flag as upFlag,
       c.whatsapp_status as whatsappStatus,
+      c.original_status as originalStatus,
+      c.warranty_status as warrantyStatus,
+      c.amount as amount,
       (
         SELECT GROUP_CONCAT(pn.raw_input, ', ')
         FROM phone_numbers pn
@@ -425,8 +438,31 @@ export function getPendingCalls() {
     phoneNumbers: r.phoneNumbers || '',
     isDuplicate: r.duplicateNumberTrigger !== null,
     duplicateNumberTrigger: r.duplicateNumberTrigger,
-    whatsappStatus: r.whatsappStatus
+    whatsappStatus: r.whatsappStatus,
+    originalStatus: r.originalStatus || '',
+    warrantyStatus: r.warrantyStatus || null,
+    amount: r.amount || ''
   }));
+}
+
+/**
+ * Updates the warranty status for a call (in/out/null).
+ */
+export function updateWarrantyStatus(callId, warrantyStatus) {
+  db.prepare(`UPDATE calls SET warranty_status = ? WHERE id = ?`).run(
+    warrantyStatus || null,
+    callId
+  );
+}
+
+/**
+ * Updates the amount field for a call.
+ */
+export function updateAmount(callId, amount) {
+  db.prepare(`UPDATE calls SET amount = ? WHERE id = ?`).run(
+    amount || null,
+    callId
+  );
 }
 
 /**

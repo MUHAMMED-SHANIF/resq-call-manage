@@ -16,7 +16,9 @@ import {
   updateAllPlaceGroups,
   batchApproveCalls,
   deleteHistoryCall,
-  clearAllHistory
+  clearAllHistory,
+  updateWarrantyStatus,
+  updateAmount
 } from './database.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -186,6 +188,28 @@ ipcMain.handle('db:clear-all-history', async () => {
     return { success: true, deleted: count };
   } catch (err) {
     console.error('IPC db:clear-all-history error:', err);
+    throw err;
+  }
+});
+
+// Update warranty status for a single call
+ipcMain.handle('db:update-warranty-status', async (event, callId, warrantyStatus) => {
+  try {
+    updateWarrantyStatus(callId, warrantyStatus);
+    return { success: true };
+  } catch (err) {
+    console.error('IPC db:update-warranty-status error:', err);
+    throw err;
+  }
+});
+
+// Update amount for a single call
+ipcMain.handle('db:update-amount', async (event, callId, amount) => {
+  try {
+    updateAmount(callId, amount);
+    return { success: true };
+  } catch (err) {
+    console.error('IPC db:update-amount error:', err);
     throw err;
   }
 });
